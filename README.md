@@ -10,6 +10,7 @@
 * [cite_start]**教学域 (Academic Metadata)**：定义课程元数据、标签体系和前置课依赖。它决定了“有什么课”以及“谁能选” [cite: 1]。
 * [cite_start]**执行域 (Scheduling & Stock)**：管理具体的“教学班”实例、库存与时间空间分配。这是流量压力的核心 [cite: 1]。
 * [cite_start]**选课域 (Transaction & Interaction)**：处理选课动作、意向轮权重计算、抢课轮原子操作，并生成最终结果 [cite: 1]。
+* [cite_start]**审计域(User & Interaction)**：管理用户操作日志、异常记录、系统状态等。这是系统的监控和调试基础 [cite: 1]。
 
 ---
 
