@@ -10,7 +10,7 @@
 * [cite_start]**教学域 (Academic Metadata)**：定义课程元数据、标签体系和前置课依赖。它决定了“有什么课”以及“谁能选” [cite: 1]。
 * [cite_start]**执行域 (Scheduling & Stock)**：管理具体的“教学班”实例、库存与时间空间分配。这是流量压力的核心 [cite: 1]。
 * [cite_start]**选课域 (Transaction & Interaction)**：处理选课动作、意向轮权重计算、抢课轮原子操作，并生成最终结果 [cite: 1]。
-* 数据库的内容
+ 数据库的内容
 * [cite_start]**审计域(User & Interaction)**：管理用户操作日志、异常记录、系统状态等。这是系统的监控和调试基础 [cite: 1]。
 
 ---
@@ -39,7 +39,7 @@
 * **L1：本地缓存 (Caffeine)**：存储极度静态且高频访问的数据（如全校通用的选课准入规则），实现零 I/O 延迟。
 * **L2：分布式缓存 (Redis)**：
   * **库存 (Stock)**：使用 Lua 脚本保证“读库存-扣库存”的原子性。
-  * [cite_start]**极致位图 (Time Bitmap)**：将一周划分为 1024 个时间片 [cite: 1]。冲突校验简化为一次二进制 `&` 运算：$Student\_Bitmap \ \& \ Class\_Bitmap \neq 0$。
+  * [cite_start]**极致位图 (Time Bitmap)**：将一天划分为 9 个时间片 ，每个class分配1024时间片。冲突校验简化为一次二进制 `&` 运算：$Student\_Bitmap \ \& \ Class\_Bitmap \neq 0$。
 * **L3：持久层 (MySQL)**：负责最终的静态资格校验和结果持久化。
 
 ---
