@@ -157,17 +157,10 @@ public class SelectionEngine {
 ```
 
 ---
+## 四、 模块化单体
+既然是单体项目，我们不需要搞微服务那套复杂的网络调用，但我们要搞 “模块化单体 (Modular Monolith)”。这样等以后要升级到 SpringCloud 时，只需要拆分模块，不需要重写代码。
 
-### 四、 “地基”建议
-
-1. **先跑通“静态校验”**：今晚不要急着写 Redis。先在本地 MySQL 建立 `edu_course`、`edu_tag`、`edu_course_tag_mapping` 表。
-2. **实现一个简单的 Spec**：比如 `GradeSpec`（年级校验）。尝试通过查询课程的标签，动态唤醒这个 Spec 运行。
-3. **对齐 UserContext**：把你之前的 `ThreadLocalUtil` 升级为使用 `record UserContext`，并确保拦截器能在选课前把 `scheduleBitmap` 预热进去。
-
-单体项目的“工业级”模块构建
-既然是单体项目，我们不需要搞微服务那套复杂的网络调用，但我们要搞 “模块化单体 (Modular Monolith)”。这样等你以后要升级到 SpringCloud 时，只需要拆分模块，不需要重写代码。
-
-## 建议目录结构（对应你上传的项目结构）
+## 建议目录结构
 
 ``` mermaid
 graph TD
