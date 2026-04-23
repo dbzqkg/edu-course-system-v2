@@ -294,3 +294,19 @@ edu-course-system (Project Root)
 数据库中的tag另存优先级，顺序为层序
 路径扁平化后通过set去重，再通过优先级队列排序，最后放入普通数组中作为享元使用（项目启动时完成）
 责任链不再是传统链式调用，而是转为迭代遍历
+
+# 技术栈
+
+1. Java
+2. SpringBoot3
+3. MyBatis-Plus
+4. Redis
+5. Redisson
+6. Caffeine
+7. MySQL
+8. JWT
+9. SnowFlake
+10. BitMap
+11. MQ，未定
+12. Swagger
+13. Slf4j
