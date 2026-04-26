@@ -76,6 +76,112 @@
 
 ```mermaid
 graph TD
+    %% 应用接入层
+    subgraph Application_Layer [应用接入层 - 厚应用/薄逻辑]
+        Server["edu-server<br/>(学生端 - 高并发抢课)"]
+        Admin["edu-admin<br/>(管理端 - 规则预热)"]
+    end
+
+    %% 业务大脑层
+    subgraph Domain_Layer [业务大脑 - 核心领域层]
+        Domain["edu-domain<br/>(逻辑校验引擎/工厂/状态机)"]
+    end
+
+    %% 技术支撑层
+    subgraph Infrastructure_Layer [技术实现 - 基础设施层]
+        Infra["edu-infrastructure<br/>(Mapper实现/Redis/TypeHandler)"]
+    end
+
+    %% 数据模型层
+    subgraph Model_Layer [核心模型 - POJO层]
+        Pojo["edu-pojo<br/>(数据库实体/Domain Entity)"]
+    end
+
+    %% 工具层
+    subgraph Common_Layer [通用武器 - 工具层]
+        Common["edu-common<br/>(JWT/位图工具/ThreadLocal/雪花ID)"]
+    end
+
+    %% 依赖连线
+    Server --> Domain
+    Admin --> Domain
+    Domain --> Infra
+    Infra --> Pojo
+    Pojo --> Common
+
+    %% 说明样式
+    style Common fill:#f9f,stroke:#333,stroke-width:2px
+    style Domain fill:#bbf,stroke:#333,stroke-width:4px
+    style Server fill:#dfd,stroke:#333,stroke-width:2px
+    style Admin fill:#dfd,stroke:#333,stroke-width:2px
+```
+
+### 部分目录描述，不全
+
+```plaintext
+edu-course-system (Root - 根工程，管理全局依赖与版本)
+├── .env                  <-- 环境变量：存储数据库/Redis密码 (本地独有，Git忽略)
+├── .env.example          <-- 环境变量模板：给协作者参考的样板房
+├── .gitignore            <-- 哨兵：防止敏感配置和编译产物泄露
+├── pom.xml               <-- 依赖中心：定义 SpringBoot 3.x 及 MP, Redisson 等版本
+├── README.md             <-- 灵魂：架构设计文档与选课模式说明
+│
+├── edu-common (通用能力模块)
+│   └── src/main/java/com/lzh
+│       ├── context       <-- StuContext (Java 17 record，ThreadLocal透传)
+│       ├── enums         <-- AppResultCode (统一业务状态码)
+│       ├── result        <-- Result, PageResult (统一响应体)
+│       └── util          <-- 核心武器 (JwtUtil, BitMapUtils, SnowflakeIdUtil, ThreadLocalUtil)
+│
+├── edu-pojo (领域模型层 - 核心 DDD 划分)
+│   └── src/main/java/com/lzh
+│       ├── academic      <-- 教学域：Course, Tag, CourseTagRelation
+│       ├── audit         <-- 审计域：AdminAuditLog, SelectionLog
+│       ├── identity      <-- 身份域：Student, Dept, Major
+│       ├── scheduling    <-- 执行域：EduClass (包含二进制位图字段)
+│       ├── system        <-- 控制域：SystemConfig (全局开关)
+│       └── transaction   <-- 选课域：SelectionResult, SelectionBook, LocalMessage
+│
+├── edu-infrastructure (基础设施层 - 屏蔽技术实现)
+│   └── src/main/java/com/lzh
+│       ├── config        <-- MyBatis-Plus, Redis, Redisson, 线程池配置
+│       ├── handler       <-- TypeHandler (实现 long[] 与 VARBINARY(128) 互转)
+│       ├── mapper        <-- 按照 pojo 领域建立子包 (identity, academic 等)
+│       └── repository    <-- (可选) 仓储模式实现，对 Domain 屏蔽数据库细节
+│
+├── edu-domain (核心领域逻辑层 - 业务大脑)
+│   └── src/main/java/com/lzh/domain
+│       ├── transaction   <-- 选课校验引擎：SelectionCheckEngine (位图冲突逻辑)
+│       ├── system        <-- 状态管理器：ConfigContext (本地缓存阶段开关)
+│       └── identity      <-- 准入校验：StudentValidator (学费、评教状态校验)
+│
+├── edu-server
+├── controller
+│   └── SelectionController.java    <-- 核心选课入口
+├── interceptor
+│   └── JwtInterceptor.java         <-- 实现 JWT 解析与 Jitter 续期
+├── service
+│   └── SelectionAppService.java    <-- 编排抢课流程：查 Redis -> 调 Domain 算位图 -> 写消息表
+└── task (或 async)
+    └── ResultPersistenceTask.java  <-- 基于自定义线程池的异步落库任务
+│
+└── edu-admin (管理端应用模块 - 系统配置与监控)
+└── src/main/java/com/lzh
+    ├── controller
+    │   ├── CourseManagerController.java  <-- 课程增删改查
+    │   ├── WarmupController.java         <-- 触发 Redis 预热接口
+    │   └── SystemConfigController.java   <-- 切换选课阶段 (BOOKING/ROBBING) 
+    ├── service
+    │   ├── WarmupAppService.java         <-- 编排预热逻辑
+    │   └── ExcelImportService.java       <-- 配合 EasyExcel 批量导入学生/课程
+    ├── dto
+    │   └── CourseSaveDTO.java            <-- 接收前端表单
+    └── vo
+        └── SelectionTraceVO.java         <-- 审计日志展示对象
+```
+
+```mermaid
+graph TD
     %% 客户端与接入层
     subgraph Client_Layer [接入层]
         Student["学生端 (预选/抢课/意向)"]
@@ -202,8 +308,22 @@ graph TD
 
 ### 待处理
 
-#### 使用工厂自动配置log
+#### 使用注解+AOP+工厂自动配置log，并使用pub-sub模式异步记录log
+
+#### 不要用@transactional
+
+es
+
+#### TimeBitMap的位图工具方法待判断逻辑优化
 
 ### 已处理
 
 #### 使用.env配置信息并列入.gitignore
+
+#### 在vo封装位图以便于使用LongArrayTypeHandler进行位图转换
+
+#### 使用版本号管理Class的时间位图，额有点问题，但是我已经想到办法了
+
+#### log行为上升到pojo，因为common和infrastructure都不合适
+
+## 快照模式解决不同版本的时间位图造成无法退课
