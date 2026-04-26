@@ -14,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest(classes = EduServerApplication.class)
 @Slf4j
+
 public class AnnotationTest {
 
     @Autowired

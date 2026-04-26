@@ -1,5 +1,6 @@
 package com.lzh.config;
 
+import com.lzh.handler.DiskLogRejectedExecutionHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -11,6 +12,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Configuration
 @EnableAsync // 开启 Spring 异步支持
 public class ThreadPoolConfig {
+
 
     /**
      * 审计日志专用线程池
@@ -27,8 +29,9 @@ public class ThreadPoolConfig {
         executor.setQueueCapacity(5000);
         executor.setThreadNamePrefix("Selection-Audit-");
         
-        // 拒绝策略：如果日志队列满了，由调用方(主线程)执行，起到降级限流作用
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        // 拒绝策略：如果日志队列满了，由调用方(主线程)执行，起到降级限流作用 （已废弃）
+        // 磁盘记录加快处理时间
+        executor.setRejectedExecutionHandler(new DiskLogRejectedExecutionHandler());
         
         executor.initialize();
         return executor;

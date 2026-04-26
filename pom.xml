@@ -38,6 +38,7 @@
         <fastjson2.version>2.0.49</fastjson2.version>
         <lombok.version>1.18.36</lombok.version>
         <spring-dotenv.version>4.0.0</spring-dotenv.version>
+        <jakarta.annotation-api.version>2.1.1</jakarta.annotation-api.version>
     </properties>
 
     <dependencyManagement>
@@ -102,6 +103,11 @@
                 <groupId>com.github.ben-manes.caffeine</groupId>
                 <artifactId>caffeine</artifactId>
                 <version>${caffeine.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>jakarta.annotation</groupId>
+                <artifactId>jakarta.annotation-api</artifactId>
+                <version>${jakarta.annotation-api.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

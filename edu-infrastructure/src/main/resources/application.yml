@@ -1,0 +1,3 @@
+app:
+  logging:
+    reject-path: ${REJECT_LOG_PATH:/tmp/reject.log}

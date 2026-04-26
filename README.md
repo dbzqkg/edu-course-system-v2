@@ -314,7 +314,7 @@ graph TD
 
 #### TimeBitMap的位图工具方法判断逻辑优化
 
-#### 将拒绝策略从当前线程网络IO改为磁盘顺序写日志
+#### 和退课有关的数据库及类未创建
 
 ### 已处理
 
@@ -326,4 +326,100 @@ graph TD
 
 #### log行为上升到pojo，因为common和infrastructure都不合适
 
+#### 将拒绝策略从当前线程网络IO改为磁盘顺序写日志，并禁用@Async改为使用Runnable类重写toString方法
+
+引入了磁盘日志分级补偿机制：正常数据入库，异常数据隔离至 .error 文件，所有历史轨迹通过 .bak 归档，确保数据链路 100% 可追溯。
+
 ## 快照模式解决不同版本的时间位图造成无法退课
+
+## 补偿恢复流解决失败sql日志的回写
+
+扫描器 (Scanner)：定时任务每隔 5-10 分钟读取一次 reject.log。
+
+解析器 (Parser)：利用Fastjson2，将日志中的 JSON 字符串还原成 SelectionLog 对象。
+
+执行器 (Executor)：将还原出的对象重新调用 Mapper 插入数据库。
+
+清理器 (Cleaner)：处理成功的记录需要标记或删除日志文件，防止重复恢复。
+
+既然我们要对标**工业级生产标准**，在 `README.md` 中不仅要记录功能，更要体现**高可用架构设计**的思想。
+
+你可以将以下内容添加到 `README.md` 的 **“5. 异步补偿与高可靠设计”** 章节中。
+
+---
+
+## 7. 磁盘日志补偿机制 (High Reliability Recovery)
+
+为了应对极端高并发下线程池耗尽或数据库瞬时宕机，系统实现了基于磁盘日志的**自愈式补偿架构**。
+
+逻辑：逐行读取 -> 反序列化 -> 幂等入库 -> 异常分流
+
+1. 解决 AOP 切面硬编码 (逻辑一致性风险)
+2. 解决磁盘日志解析的“脆弱性” (解析风险)
+    定义了常量 IDENTIFIER = "TASK_REJECTED|" 。解析时改用 line.lastIndexOf(IDENTIFIER)
+3. 解决状态机锁定漏洞 (资源死锁/丢失)
+    互斥判断：通过 hasOldJob 和 hasNewJob 两个布尔值判断当前状态 。自愈优先：如果 hasOldJob 为真（存在旧的 .processing 文件），代码会打印一条 【自愈】 警告，跳过文件移动步骤，直接去处理这个旧文件 。
+    原子操作：在移动新文件时，使用 StandardCopyOption.ATOMIC_MOVE 且不带 REPLACE_EXISTING 。如果此时由于某种意外目标文件已存在，移动操作会报错而不是覆盖 。结果：确保了任何时刻文件都不会被覆盖。即便系统在处理中途宕机 100 次，第 101 次启动时依然能找回之前没处理完的数据 。
+4. 解决幂等性处理不当 (误判风险)
+    在 insert 语句外层精准捕获 DuplicateKeyException（唯一键冲突异常） 。捕获到该异常后，不进入重试逻辑，而是直接执行 successCount++ 。结果：这体现了“幂等”的设计思想。对于补偿任务来说，如果目标状态已经达成（数据已在库里），那我们就认为这次任务是成功的。这避免了虚假的系统报警，提高了系统的自愈效率 。
+
+```mermaid
+graph TD
+    %% 阶段1：切面拦截
+    A[ClassService.selectClass] -->|1. AOP 拦截| B[SelectionLogAspect.doAround]
+    B -->|2. 获取环境快照| B1[SnowflakeIdUtil.getGeneratedId, ThreadLocalUtil.get]
+    B -->|3. 解析参数| B2[SelectionLogAspect.getTargetArgument]
+    B -->|4. 放行业务| C{joinPoint.proceed}
+    
+    %% 阶段2：结果捕获
+    C -->|成功| D[SelectionLogFactory.createSuccess]
+    C -->|异常| E[SelectionLogFactory.createFail]
+    
+    %% 阶段3：异步发射
+    D & E -->|5. 发射信号弹| F[ApplicationEventPublisher.publishEvent]
+    F -->|6. 监听捕获| G[SelectionLogListener.onSelectionLogGenerated]
+    
+    %% 阶段4：线程池分流
+    G -->|7. 提交任务| H[auditLogExecutor.execute]
+    
+    subgraph Thread_Pool [auditLogExecutor 线程池内部]
+        H1{队列是否有位置?}
+        H1 -->|有| I[SelectionLogTask.run]
+        H1 -->|无| J[DiskLogRejectedExecutionHandler.rejectedExecution]
+    end
+    
+    %% 阶段5：最终落地方案
+    I -->|8a. 正常入库| K[(MySQL: edu_selection_log)]
+    J -->|8b. 降级序列化| L[SelectionLogTask.toString]
+    L -->|8c. 磁盘顺序写| M[File: reject.log]
+```
+
+```mermaid
+graph TD
+    %% 阶段1：状态检查与自愈
+    Start([定时任务启动: recoverFromDisk]) -->|1. 检查状态| Check{是否有文件?}
+    Check -->|无| End([结束退出])
+    
+    Check -->|存在 .processing| S1[【自愈】跳过移动，直接处理旧包]
+    Check -->|仅存在 .log| S2[【锁定】Files.move - ATOMIC_MOVE]
+    
+    S1 & S2 -->|2. 执行处理| P[LogRecoveryScheduler.doProcess]
+    
+    %% 阶段2：解析与入库
+    subgraph Processing_Loop [逐行解析逻辑]
+        P1[BufferedReader.readLine] --> P2{找到 IDENTIFIER?}
+        P2 -->|是| P3[JSON.parseObject]
+        P3 -->|3. 尝试入库| P4[selectionLogMapper.insert]
+        
+        P4 -->|唯一键冲突| P5[【幂等】successCount++]
+        P4 -->|普通异常| P6[handleRetryLogic]
+        P6 -->|重试 < 3| P6a[放入 retryLines]
+        P6 -->|重试 >= 3| P6b[放入 fatalLines]
+    end
+    
+    %% 阶段3：收尾归档
+    P4 -->|4. 收尾| F[LogRecoveryScheduler.finalizeBatch]
+    F -->|5. 写回重试数据| F1[Files.write - APPEND]
+    F -->|6. 隔离致命数据| F2[Files.write - .fatal]
+    F -->|7. 归档备份| F3[Files.move - .bak]
+```
