@@ -312,8 +312,6 @@ graph TD
 
 #### 不要用@transactional
 
-es
-
 #### TimeBitMap的位图工具方法待判断逻辑优化
 
 ### 已处理
