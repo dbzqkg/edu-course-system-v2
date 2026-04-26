@@ -312,7 +312,9 @@ graph TD
 
 #### 不要用@transactional
 
-#### TimeBitMap的位图工具方法待判断逻辑优化
+#### TimeBitMap的位图工具方法判断逻辑优化
+
+#### 将拒绝策略从当前线程网络IO改为磁盘顺序写日志
 
 ### 已处理
 
